@@ -308,11 +308,14 @@ Better Script:
 {report['better_script']}
 """
 
-            st.download_button(
-                "📥 Download Report",
-                download_text,
-                file_name=f"{rep_name}_report.txt"
-            )
+            docx_file = create_docx_report(report)
+
+st.download_button(
+    "📥 Download DOCX Report",
+    docx_file,
+    file_name=f"{rep_name}_call_coaching_report.docx",
+    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+)
 
 # =========================================================
 # HISTORY
