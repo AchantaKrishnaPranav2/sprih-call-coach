@@ -16,19 +16,76 @@ st.set_page_config(
     layout="wide",
 )
 
-PRIMARY_GREEN = "1A3A2A"
-AMBER = "F59E0B"
-
+PRIMARY_GREEN = "#1a3a2a"
+CARD_BG = "#111827"
+ACCENT = "#10b981"
 
 # =========================================================
-# SESSION STATE
+# GLOBAL STYLING
+# =========================================================
+st.markdown(
+    f"""
+    <style>
+    .stApp {{
+        background-color: #0b1220;
+        color: white;
+    }}
+
+    section[data-testid="stSidebar"] {{
+        background-color: {PRIMARY_GREEN};
+    }}
+
+    .main-card {{
+        background-color: {CARD_BG};
+        padding: 1rem;
+        border-radius: 14px;
+        border: 1px solid #1f2937;
+        margin-bottom: 1rem;
+    }}
+
+    .section-title {{
+        font-size: 24px;
+        font-weight: 700;
+        color: white;
+        margin-bottom: 0.8rem;
+    }}
+
+    .metric-card {{
+        background: #111827;
+        padding: 1rem;
+        border-radius: 12px;
+        border-left: 5px solid {ACCENT};
+        margin-bottom: 1rem;
+    }}
+
+    .coach-card {{
+        background: #111827;
+        padding: 1rem;
+        border-radius: 12px;
+        border-left: 5px solid #ef4444;
+        margin-bottom: 1rem;
+    }}
+
+    .good-card {{
+        background: #111827;
+        padding: 1rem;
+        border-radius: 12px;
+        border-left: 5px solid #22c55e;
+        margin-bottom: 1rem;
+    }}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# =========================================================
+# SESSION
 # =========================================================
 if "coach_reports" not in st.session_state:
     st.session_state.coach_reports = []
 
 if "gtm_reports" not in st.session_state:
     st.session_state.gtm_reports = []
-
 
 # =========================================================
 # HELPERS
@@ -41,16 +98,12 @@ def shade_cell(cell, fill):
 
 
 def generate_call_coach_report(data):
-    """
-    Mimics call coach skill structure
-    """
     transcript = data["transcript"].lower()
 
-    # Dynamic scoring
     meddic = {
         "Metrics": 8 if "cost" in transcript else 6,
-        "Economic Buyer": 7 if "stakeholder" in transcript else 5,
-        "Decision Criteria": 8 if "requirement" in transcript else 6,
+        "Economic Buyer": 7,
+        "Decision Criteria": 8,
         "Decision Process": 7,
         "Identify Pain": 9 if "pain" in transcript else 6,
         "Champion": 5,
@@ -65,213 +118,46 @@ def generate_call_coach_report(data):
 
     actions = [
         "TODAY — send quantified follow-up questions",
-        "THIS WEEK — map stakeholder decision process",
-        "BEFORE NEXT CALL — prepare ROI narrative",
+        "THIS WEEK — map stakeholders",
+        "BEFORE NEXT CALL — build ROI narrative",
     ]
 
     return {
         "header": data,
-        "classification": (
-            f"This was classified as a {data['call_type']} call "
-            f"originating from {data['origination']} based on the "
-            f"transcript signals and current deal stage "
-            f"({data['deal_stage']})."
-        ),
         "meddic": meddic,
         "deal_health": deal_health,
         "actions": actions,
-        "coaching_moments": [
-            {
-                "what": "You uncovered the problem clearly.",
-                "why": "This creates strong discovery momentum.",
-                "better": (
-                    "Can you help quantify the business impact?"
-                ),
-            },
-            {
-                "what": "You did not probe decision authority deeply.",
-                "why": (
-                    "This is an opportunity to improve deal control."
-                ),
-                "better": (
-                    "Who besides you would need to sign off?"
-                ),
-            },
-        ],
-        "themes": {
-            "signals": [
-                "budget sensitivity",
-                "timeline pressure",
-            ],
-            "requirements": [
-                "faster reporting",
-                "cross-functional visibility",
-            ],
-            "patterns": [
-                "repeated manual process pain",
-            ],
-        },
-        "overall_score": round(sum(meddic.values()) / len(meddic), 1),
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "overall_score": round(
+            sum(meddic.values()) / len(meddic), 1
+        ),
+        "timestamp": datetime.now().strftime(
+            "%Y-%m-%d %H:%M"
+        ),
     }
 
 
 def create_docx_report(report):
     doc = Document()
 
-    # =====================================================
-    # HEADER
-    # =====================================================
-    header = doc.add_table(rows=1, cols=2)
-    header.alignment = WD_TABLE_ALIGNMENT.CENTER
+    table = doc.add_table(rows=1, cols=2)
+    left = table.cell(0, 0)
+    right = table.cell(0, 1)
 
-    left = header.cell(0, 0)
-    right = header.cell(0, 1)
+    shade_cell(left, "1A3A2A")
+    shade_cell(right, "F59E0B")
 
-    shade_cell(left, PRIMARY_GREEN)
-    shade_cell(right, AMBER)
-
-    header_data = report["header"]
+    h = report["header"]
 
     run = left.paragraphs[0].add_run(
-        f"CALL COACH REPORT\n"
-        f"{header_data['rep_name']}\n"
-        f"{header_data['company']}\n"
-        f"{header_data['call_date']}\n"
-        f"{header_data['call_type']} | "
-        f"{header_data['origination']}"
+        f"{h['rep_name']}\n"
+        f"{h['company']}\n"
+        f"{h['call_type']} | {h['origination']}"
     )
     run.font.color.rgb = RGBColor(255, 255, 255)
-    run.font.size = Pt(13)
-    run.bold = True
 
-    score_run = right.paragraphs[0].add_run(
-        f"Overall\n{report['overall_score']}/10"
+    right.paragraphs[0].add_run(
+        f"{report['overall_score']}/10"
     )
-    score_run.font.size = Pt(16)
-    score_run.bold = True
-
-    doc.add_paragraph()
-
-    # =====================================================
-    # CONTEXT SUMMARY
-    # =====================================================
-    doc.add_heading("1. CONTEXT SUMMARY", level=1)
-
-    table = doc.add_table(rows=5, cols=2)
-    table.style = "Table Grid"
-
-    rows = [
-        ("Call Type", header_data["call_type"]),
-        ("Origination", header_data["origination"]),
-        (
-            "Discovery Previously Done",
-            header_data["discovery_done"],
-        ),
-        ("Deal Stage", header_data["deal_stage"]),
-        ("Previous Notes", header_data["previous_notes"]),
-    ]
-
-    for i, (k, v) in enumerate(rows):
-        table.cell(i, 0).text = k
-        table.cell(i, 1).text = v
-
-    doc.add_paragraph(
-        f"Calibration Note: {header_data['calibration_note']}"
-    )
-
-    # =====================================================
-    # CALL CLASSIFICATION
-    # =====================================================
-    doc.add_heading("2. CALL CLASSIFICATION", level=1)
-    doc.add_paragraph(report["classification"])
-
-    # =====================================================
-    # FRAMEWORK SCORES
-    # =====================================================
-    doc.add_heading("3. FRAMEWORK SCORES", level=1)
-
-    score_table = doc.add_table(
-        rows=len(report["meddic"]) + 1,
-        cols=3
-    )
-    score_table.style = "Table Grid"
-
-    score_table.cell(0, 0).text = "Dimension"
-    score_table.cell(0, 1).text = "Score"
-    score_table.cell(0, 2).text = "Path Forward"
-
-    for i, (k, v) in enumerate(
-        report["meddic"].items(), start=1
-    ):
-        score_table.cell(i, 0).text = k
-        score_table.cell(i, 1).text = f"{v}/10"
-
-        if v <= 6:
-            score_table.cell(i, 2).text = (
-                "Probe deeper in next interaction"
-            )
-        else:
-            score_table.cell(i, 2).text = "Maintain strength"
-
-    # =====================================================
-    # DEAL HEALTH
-    # =====================================================
-    doc.add_heading("4. DEAL HEALTH", level=1)
-
-    for k, v in report["deal_health"].items():
-        doc.add_paragraph(f"{k}: {v}")
-
-    # =====================================================
-    # COACHING MOMENTS
-    # =====================================================
-    doc.add_heading("5. COACHING MOMENTS", level=1)
-
-    for idx, moment in enumerate(
-        report["coaching_moments"], start=1
-    ):
-        doc.add_paragraph(
-            f"Moment {idx} — What happened: {moment['what']}"
-        )
-        doc.add_paragraph(
-            f"Why it matters: {moment['why']}"
-        )
-        doc.add_paragraph(
-            f"Better version: {moment['better']}"
-        )
-
-    # =====================================================
-    # THEMES
-    # =====================================================
-    doc.add_heading("6. THEMES & INTELLIGENCE", level=1)
-
-    doc.add_paragraph("Signals & Objections")
-    for x in report["themes"]["signals"]:
-        doc.add_paragraph(f"• {x}")
-
-    doc.add_paragraph("Requirements")
-    for x in report["themes"]["requirements"]:
-        doc.add_paragraph(f"• {x}")
-
-    doc.add_paragraph("Patterns")
-    for x in report["themes"]["patterns"]:
-        doc.add_paragraph(f"• {x}")
-
-    # =====================================================
-    # ACTIONS
-    # =====================================================
-    doc.add_heading("7. TOP 3 IMMEDIATE ACTIONS", level=1)
-
-    for action in report["actions"]:
-        doc.add_paragraph(action)
-
-    # FOOTER
-    footer = doc.add_paragraph()
-    footer_run = footer.add_run(
-        "Sprih Call Coach (automated)"
-    )
-    footer_run.italic = True
-    footer_run.font.size = Pt(10)
 
     stream = BytesIO()
     doc.save(stream)
@@ -281,7 +167,7 @@ def create_docx_report(report):
 
 
 # =========================================================
-# MAIN HEADER
+# APP HEADER
 # =========================================================
 st.title("🚀 Sprih Internal Automations")
 st.caption(
@@ -289,7 +175,7 @@ st.caption(
 )
 
 # =========================================================
-# SIDEBAR (HTML-like structure)
+# SIDEBAR
 # =========================================================
 st.sidebar.title("Automations")
 
@@ -307,31 +193,50 @@ module = st.sidebar.radio(
 # DASHBOARD
 # =========================================================
 if module == "📊 Dashboard":
-    st.header("📊 Dashboard")
+    st.markdown(
+        '<div class="section-title">📊 Dashboard</div>',
+        unsafe_allow_html=True,
+    )
 
     col1, col2 = st.columns(2)
 
-    col1.metric(
-        "Call Coach Reports",
-        len(st.session_state.coach_reports),
-    )
+    with col1:
+        st.markdown(
+            f"""
+            <div class="metric-card">
+                <h3>Call Coach Reports</h3>
+                <h1>{len(st.session_state.coach_reports)}</h1>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-    col2.metric(
-        "GTM Runs",
-        len(st.session_state.gtm_reports),
-    )
+    with col2:
+        st.markdown(
+            f"""
+            <div class="metric-card">
+                <h3>GTM Outreach Runs</h3>
+                <h1>{len(st.session_state.gtm_reports)}</h1>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 # =========================================================
 # CALL COACH
 # =========================================================
 elif module == "📞 Call Coach":
-    st.header("📞 Call Coach")
+    st.markdown(
+        '<div class="section-title">📞 Call Coach</div>',
+        unsafe_allow_html=True,
+    )
 
     col1, col2 = st.columns([2, 1])
 
     with col1:
         rep_name = st.text_input("Sales Rep Name")
         company = st.text_input("Prospect / Company")
+
         call_date = st.date_input("Call Date")
 
         call_type = st.selectbox(
@@ -384,15 +289,19 @@ elif module == "📞 Call Coach":
         generate = st.button("🎯 Generate Report")
 
     with col2:
-        st.info(
+        st.markdown(
             """
-**Frameworks**
-- MEDDIC
-- Deal Health
-- Coaching Moments
-- Themes
-- Immediate Actions
-"""
+            <div class="main-card">
+                <h3>Frameworks</h3>
+                <ul>
+                    <li>MEDDIC</li>
+                    <li>Deal Health</li>
+                    <li>Coaching Moments</li>
+                    <li>Themes</li>
+                </ul>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
 
     if generate:
@@ -410,20 +319,49 @@ elif module == "📞 Call Coach":
         }
 
         report = generate_call_coach_report(data)
-
         st.session_state.coach_reports.append(report)
 
         st.success("Report generated")
-
-        st.subheader("Report Preview")
 
         st.metric(
             "Overall Score",
             f"{report['overall_score']}/10",
         )
 
+        st.subheader("Framework Scores")
         for k, v in report["meddic"].items():
-            st.write(f"**{k}**: {v}/10")
+            st.markdown(
+                f"""
+                <div class="metric-card">
+                    <b>{k}</b><br>
+                    {v}/10
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        st.subheader("Deal Health")
+        for k, v in report["deal_health"].items():
+            st.markdown(
+                f"""
+                <div class="good-card">
+                    <b>{k}</b><br>
+                    {v}
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        st.subheader("Top Actions")
+        for action in report["actions"]:
+            st.markdown(
+                f"""
+                <div class="coach-card">
+                    {action}
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
         docx = create_docx_report(report)
 
@@ -438,7 +376,10 @@ elif module == "📞 Call Coach":
 # GTM OUTREACH
 # =========================================================
 elif module == "🎯 GTM Outreach":
-    st.header("🎯 GTM Outreach")
+    st.markdown(
+        '<div class="section-title">🎯 GTM Outreach</div>',
+        unsafe_allow_html=True,
+    )
 
     company_name = st.text_input("Target Company")
     persona = st.text_input("Persona")
@@ -447,18 +388,26 @@ elif module == "🎯 GTM Outreach":
     if st.button("Generate Outreach Brief"):
         st.success("Outreach brief created")
 
-        st.write("### Sample Email")
-        st.write(
-            f"Hi team at {company_name},\n\n"
-            f"I noticed {hook}.\n"
-            f"I’d love to connect regarding ESG workflows."
+        st.markdown(
+            f"""
+            <div class="main-card">
+                <h3>Email Draft</h3>
+                <p>Hi {company_name} team,</p>
+                <p>I noticed {hook}.</p>
+                <p>Would love to connect regarding ESG workflows.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
 
 # =========================================================
 # HISTORY
 # =========================================================
 elif module == "📚 History":
-    st.header("📚 History")
+    st.markdown(
+        '<div class="section-title">📚 History</div>',
+        unsafe_allow_html=True,
+    )
 
     for report in reversed(
         st.session_state.coach_reports
