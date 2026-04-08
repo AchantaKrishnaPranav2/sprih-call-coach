@@ -1,7 +1,95 @@
 import streamlit as st
 from docx import Document
 from datetime import datetime
+from docx import Document
+from docx.shared import Inches, Pt
+from io import BytesIO
 
+
+def create_docx_report(report):
+    doc = Document()
+
+    # Cover heading
+    heading = doc.add_heading("Call Coaching Report", 0)
+    heading.runs[0].font.size = Pt(20)
+
+    doc.add_paragraph(f"Date: {report['timestamp']}")
+    doc.add_paragraph(f"Rep Name: {report['rep']}")
+    doc.add_paragraph(f"Call Type: {report['call_type']}")
+
+    # Context Summary
+    doc.add_heading("Context Summary", level=1)
+
+    table = doc.add_table(rows=4, cols=2)
+    table.style = "Table Grid"
+
+    table.cell(0, 0).text = "Rep Name"
+    table.cell(0, 1).text = report["rep"]
+
+    table.cell(1, 0).text = "Call Type"
+    table.cell(1, 1).text = report["call_type"]
+
+    table.cell(2, 0).text = "Date"
+    table.cell(2, 1).text = report["timestamp"]
+
+    table.cell(3, 0).text = "Overall Verdict"
+    table.cell(3, 1).text = "Strong discovery call"
+
+    # Part 1
+    doc.add_heading("Part 1 — Framework Scores", level=1)
+
+    score_table = doc.add_table(rows=3, cols=3)
+    score_table.style = "Table Grid"
+
+    score_table.cell(0, 0).text = "Framework"
+    score_table.cell(0, 1).text = "Score"
+    score_table.cell(0, 2).text = "Evidence"
+
+    score_table.cell(1, 0).text = "MEDDIC"
+    score_table.cell(1, 1).text = str(report["meddic"])
+    score_table.cell(1, 2).text = "Strong pain discovery"
+
+    score_table.cell(2, 0).text = "SPICED"
+    score_table.cell(2, 1).text = str(report["spiced"])
+    score_table.cell(2, 2).text = "Good situational context"
+
+    # Part 2
+    doc.add_heading("Part 2 — Deal Health", level=1)
+    doc.add_paragraph("Discovery depth: Strong")
+    doc.add_paragraph("Pain clarity: Adequate")
+    doc.add_paragraph("Next steps: Developing")
+    doc.add_paragraph("Deal control: Adequate")
+
+    # Part 3
+    doc.add_heading("Part 3 — Coaching Moments", level=1)
+    doc.add_paragraph(
+        "Moment 1: Great opening question. "
+        "Opportunity to quantify business impact."
+    )
+
+    doc.add_paragraph(
+        "Better version: "
+        "Can you help me quantify the financial impact?"
+    )
+
+    # Part 4
+    doc.add_heading("Part 4 — Themes & Intelligence", level=1)
+    doc.add_paragraph("Signals: Budget sensitivity")
+    doc.add_paragraph("Objections: Timeline concerns")
+    doc.add_paragraph("Patterns: Pain is operational")
+
+    # Part 5
+    doc.add_heading("Part 5 — Visual Brief", level=1)
+    doc.add_paragraph(
+        "A clean sales funnel diagram showing pain points, "
+        "buyer objections, and next steps."
+    )
+
+    file_stream = BytesIO()
+    doc.save(file_stream)
+    file_stream.seek(0)
+
+    return file_stream
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(
     page_title="Sprih Call Coach",
