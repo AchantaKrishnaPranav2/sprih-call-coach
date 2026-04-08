@@ -1,6 +1,11 @@
 import streamlit as st
 from docx import Document
-from docx.shared import Pt
+from docx.shared import Pt, Inches, RGBColor
+from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
+from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx.enum.section import WD_SECTION
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 from datetime import datetime
 from io import BytesIO
 
@@ -11,129 +16,189 @@ st.set_page_config(
     layout="wide"
 )
 
+PRIMARY_GREEN = "1A3A2A"
+
+
 # ---------------- HELPERS ----------------
 def read_docx(uploaded_file):
     doc = Document(uploaded_file)
-    text = []
-
-    for para in doc.paragraphs:
-        if para.text.strip():
-            text.append(para.text)
-
-    return "\n".join(text)
+    return "\n".join(
+        para.text for para in doc.paragraphs if para.text.strip()
+    )
 
 
 def generate_mock_report(rep_name, call_type, transcript):
-    transcript_lower = transcript.lower()
-
-    meddic = 8
-    spiced = 7
-
-    if "budget" in transcript_lower:
-        meddic += 1
-
-    if "pain" in transcript_lower:
-        spiced += 1
-
-    feedback = (
-        "You did a strong job uncovering buyer pain. "
-        "The next opportunity is to quantify business impact."
-    )
-
-    better_script = (
-        "Can you help me understand what this issue "
-        "is costing the business each quarter?"
-    )
-
     return {
         "rep": rep_name,
+        "company": "Sample Prospect",
         "call_type": call_type,
-        "meddic": meddic,
-        "spiced": spiced,
-        "feedback": feedback,
-        "better_script": better_script,
+        "origination": "Inbound",
+        "deal_stage": "Discovery",
+        "prev_notes": "Initial pain discovery completed.",
+        "meddic": 8,
+        "spiced": 7,
+        "overall_score": 7.8,
+        "feedback": "Strong discovery depth with clear pain signals.",
+        "better_script": (
+            "Can you help me quantify the business impact "
+            "this issue is creating today?"
+        ),
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M")
     }
+
+
+def add_shading(cell, fill):
+    tc_pr = cell._tc.get_or_add_tcPr()
+    shd = OxmlElement("w:shd")
+    shd.set(qn("w:fill"), fill)
+    tc_pr.append(shd)
+
+
+def add_colored_paragraph(doc, text, color):
+    p = doc.add_paragraph()
+    run = p.add_run(text)
+    run.font.size = Pt(11)
+    run.font.color.rgb = RGBColor.from_string(color)
+    return p
 
 
 def create_docx_report(report):
     doc = Document()
 
-    # Cover Heading
-    heading = doc.add_heading("Call Coaching Report", 0)
-    heading.runs[0].font.size = Pt(20)
+    # HEADER
+    table = doc.add_table(rows=1, cols=2)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    table.autofit = True
 
-    doc.add_paragraph(f"Date: {report['timestamp']}")
-    doc.add_paragraph(f"Rep Name: {report['rep']}")
-    doc.add_paragraph(f"Call Type: {report['call_type']}")
+    left = table.cell(0, 0)
+    right = table.cell(0, 1)
 
-    # Context Summary
-    doc.add_heading("Context Summary", level=1)
+    add_shading(left, PRIMARY_GREEN)
+    add_shading(right, "F59E0B")
 
-    table = doc.add_table(rows=4, cols=2)
-    table.style = "Table Grid"
+    run = left.paragraphs[0].add_run(
+        f"CALL COACHING REPORT\n"
+        f"{report['rep']} | {report['company']}\n"
+        f"{report['timestamp']}\n"
+        f"{report['call_type']} | {report['origination']}"
+    )
+    run.font.color.rgb = RGBColor(255, 255, 255)
+    run.font.size = Pt(14)
+    run.bold = True
 
-    table.cell(0, 0).text = "Rep Name"
-    table.cell(0, 1).text = report["rep"]
+    score_run = right.paragraphs[0].add_run(
+        f"Overall Score\n{report['overall_score']}/10"
+    )
+    score_run.font.size = Pt(16)
+    score_run.bold = True
 
-    table.cell(1, 0).text = "Call Type"
-    table.cell(1, 1).text = report["call_type"]
+    doc.add_paragraph()
 
-    table.cell(2, 0).text = "Date"
-    table.cell(2, 1).text = report["timestamp"]
+    # CONTEXT SUMMARY
+    doc.add_heading("1. CONTEXT SUMMARY", level=1)
 
-    table.cell(3, 0).text = "Overall Verdict"
-    table.cell(3, 1).text = "Strong discovery call"
+    context_table = doc.add_table(rows=5, cols=2)
+    context_table.style = "Table Grid"
 
-    # Part 1 - Framework Scores
-    doc.add_heading("Part 1 — Framework Scores", level=1)
+    fields = [
+        ("Call Type", report["call_type"]),
+        ("Origination", report["origination"]),
+        ("Discovery Previously Done", "Yes"),
+        ("Deal Stage", report["deal_stage"]),
+        ("Previous Call Notes", report["prev_notes"][:120])
+    ]
+
+    for i, (k, v) in enumerate(fields):
+        context_table.cell(i, 0).text = k
+        context_table.cell(i, 1).text = v
+
+    doc.add_paragraph(
+        "Calibration Note: Since this was an inbound discovery call, "
+        "the scoring framework weighted discovery depth and pain clarity."
+    )
+
+    # CALL CLASSIFICATION
+    doc.add_heading("2. CALL CLASSIFICATION", level=1)
+    doc.add_paragraph(
+        "This call is classified as a discovery call based on the "
+        "buyer-led conversation and strong problem exploration."
+    )
+
+    # FRAMEWORK SCORES
+    doc.add_heading("3. FRAMEWORK SCORES", level=1)
 
     score_table = doc.add_table(rows=3, cols=3)
     score_table.style = "Table Grid"
 
     score_table.cell(0, 0).text = "Framework"
     score_table.cell(0, 1).text = "Score"
-    score_table.cell(0, 2).text = "Evidence"
+    score_table.cell(0, 2).text = "Commentary"
 
     score_table.cell(1, 0).text = "MEDDIC"
-    score_table.cell(1, 1).text = f"{report['meddic']}/10"
-    score_table.cell(1, 2).text = "Strong pain discovery"
+    score_table.cell(1, 1).text = "8/10"
+    score_table.cell(1, 2).text = (
+        "Strong pain clarity. Path forward: quantify impact."
+    )
 
     score_table.cell(2, 0).text = "SPICED"
-    score_table.cell(2, 1).text = f"{report['spiced']}/10"
-    score_table.cell(2, 2).text = "Good situational context"
-
-    # Part 2 - Deal Health
-    doc.add_heading("Part 2 — Deal Health", level=1)
-    doc.add_paragraph("Discovery depth: Strong")
-    doc.add_paragraph("Pain clarity: Adequate")
-    doc.add_paragraph("Next steps: Developing")
-    doc.add_paragraph("Deal control: Adequate")
-
-    # Part 3 - Coaching Moments
-    doc.add_heading("Part 3 — Coaching Moments", level=1)
-    doc.add_paragraph(
-        "Moment 1: Great opening question. "
-        "Opportunity to quantify business impact."
+    score_table.cell(2, 1).text = "7/10"
+    score_table.cell(2, 2).text = (
+        "Good situational understanding."
     )
 
     doc.add_paragraph(
-        "Better version: "
-        "Can you help me quantify the financial impact?"
+        "Highest score: MEDDIC due to strong discovery.\n"
+        "Lowest score: SPICED needs more impact quantification."
     )
 
-    # Part 4 - Themes & Intelligence
-    doc.add_heading("Part 4 — Themes & Intelligence", level=1)
-    doc.add_paragraph("Signals: Budget sensitivity")
-    doc.add_paragraph("Objections: Timeline concerns")
-    doc.add_paragraph("Patterns: Pain is operational")
+    # DEAL HEALTH
+    doc.add_heading("4. DEAL HEALTH", level=1)
+    doc.add_paragraph("🟢 Discovery Depth — Strong")
+    doc.add_paragraph("🔵 Pain Clarity — Adequate")
+    doc.add_paragraph("🟠 Next Steps — Developing")
+    doc.add_paragraph("⚪ Deal Control — Not Yet Explored")
 
-    # Part 5 - Visual Brief
-    doc.add_heading("Part 5 — Visual Brief", level=1)
-    doc.add_paragraph(
-        "A clean sales funnel diagram showing pain points, "
-        "buyer objections, and next steps."
+    # COACHING MOMENTS
+    doc.add_heading("5. COACHING MOMENTS", level=1)
+
+    add_colored_paragraph(
+        doc,
+        "What happened: You asked a strong opening question.",
+        "991B1B"
     )
+
+    add_colored_paragraph(
+        doc,
+        "Why it matters: Great opportunity to deepen pain.",
+        "6B7280"
+    )
+
+    add_colored_paragraph(
+        doc,
+        f"Better version: {report['better_script']}",
+        "065F46"
+    )
+
+    # THEMES
+    doc.add_heading("6. THEMES & INTELLIGENCE", level=1)
+    doc.add_paragraph("• Signals & Objections: Budget sensitivity")
+    doc.add_paragraph("• Requirements: Faster reporting workflows")
+    doc.add_paragraph("• Patterns: Repeated operational inefficiencies")
+
+    # TOP ACTIONS
+    doc.add_heading("7. TOP 3 IMMEDIATE ACTIONS", level=1)
+    doc.add_paragraph("TODAY — Send quantified follow-up questions")
+    doc.add_paragraph("THIS WEEK — Confirm stakeholder map")
+    doc.add_paragraph("BEFORE NEXT CALL — Build ROI narrative")
+
+    # FOOTER
+    doc.add_paragraph()
+    footer = doc.add_paragraph()
+    footer_run = footer.add_run(
+        "Sprih Call Coach (automated)"
+    )
+    footer_run.italic = True
+    footer_run.font.size = Pt(10)
 
     file_stream = BytesIO()
     doc.save(file_stream)
@@ -148,172 +213,54 @@ if "reports" not in st.session_state:
 
 # ---------------- TITLE ----------------
 st.title("🎯 Sprih Call Coach")
-st.caption("AI-ready sales coaching workflow platform")
-
-# ---------------- SIDEBAR ----------------
-st.sidebar.title("Navigation")
+st.caption("Sales coaching workflow platform")
 
 page = st.sidebar.radio(
     "Go to",
     ["Dashboard", "New Analysis", "History"]
 )
 
-# =========================================================
-# DASHBOARD
-# =========================================================
+# ---------------- DASHBOARD ----------------
 if page == "Dashboard":
     st.header("📊 Dashboard")
+    st.metric("Total Calls", len(st.session_state.reports))
 
-    total_calls = len(st.session_state.reports)
-
-    avg_meddic = (
-        round(
-            sum(r["meddic"] for r in st.session_state.reports) / total_calls,
-            1
-        )
-        if total_calls > 0
-        else 0
-    )
-
-    avg_spiced = (
-        round(
-            sum(r["spiced"] for r in st.session_state.reports) / total_calls,
-            1
-        )
-        if total_calls > 0
-        else 0
-    )
-
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric("Total Calls", total_calls)
-    col2.metric("Avg MEDDIC", avg_meddic)
-    col3.metric("Avg SPICED", avg_spiced)
-
-    st.markdown("---")
-
-    st.subheader("Recent Reports")
-
-    if total_calls == 0:
-        st.info("No reports generated yet.")
-    else:
-        for report in reversed(st.session_state.reports[-3:]):
-            with st.expander(
-                f"{report['rep']} | {report['call_type']} | {report['timestamp']}"
-            ):
-                st.write(f"MEDDIC: {report['meddic']}/10")
-                st.write(f"SPICED: {report['spiced']}/10")
-                st.write(report["feedback"])
-
-# =========================================================
-# NEW ANALYSIS
-# =========================================================
+# ---------------- NEW ANALYSIS ----------------
 elif page == "New Analysis":
     st.header("📝 New Call Analysis")
 
-    col1, col2 = st.columns([2, 1])
+    rep_name = st.text_input("Sales Rep Name")
+    call_type = st.selectbox(
+        "Call Type",
+        ["Discovery", "Demo", "Followup", "Mixed"]
+    )
 
-    with col1:
-        rep_name = st.text_input("Sales Rep Name")
+    transcript = st.text_area("Transcript", height=300)
 
-        call_type = st.selectbox(
-            "Call Type",
-            ["Discovery", "Demo", "Followup", "Mixed"]
+    if st.button("🎯 Generate Report"):
+        report = generate_mock_report(
+            rep_name,
+            call_type,
+            transcript
         )
 
-        uploaded_file = st.file_uploader(
-            "Upload Transcript (.docx or .txt)",
-            type=["docx", "txt"]
+        st.session_state.reports.append(report)
+
+        st.success("Report generated successfully")
+
+        docx_file = create_docx_report(report)
+
+        st.download_button(
+            "📥 Download DOCX Report",
+            docx_file,
+            file_name=f"{rep_name}_call_coaching_report.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
 
-        transcript = ""
-
-        if uploaded_file is not None:
-            if uploaded_file.name.endswith(".docx"):
-                transcript = read_docx(uploaded_file)
-            elif uploaded_file.name.endswith(".txt"):
-                transcript = str(uploaded_file.read(), "utf-8")
-
-            st.text_area(
-                "Extracted Transcript",
-                transcript,
-                height=250
-            )
-
-        manual_input = st.text_area(
-            "Or Paste Transcript",
-            height=200
-        )
-
-        if manual_input.strip():
-            transcript = manual_input
-
-        generate = st.button("🎯 Generate Report")
-
-    with col2:
-        st.info("""
-        **Frameworks Used**
-        - MEDDIC
-        - SPICED
-        - Deal Health
-        - Coaching Moments
-        """)
-
-    if generate:
-        if not rep_name:
-            st.error("Please enter Sales Rep Name")
-        elif not transcript:
-            st.error("Please upload or paste transcript")
-        else:
-            report = generate_mock_report(
-                rep_name,
-                call_type,
-                transcript
-            )
-
-            st.session_state.reports.append(report)
-
-            st.success("Report generated successfully")
-
-            tab1, tab2, tab3 = st.tabs(
-                ["📊 Scores", "🧠 Coaching", "🎯 Better Script"]
-            )
-
-            with tab1:
-                c1, c2 = st.columns(2)
-                c1.metric("MEDDIC", f"{report['meddic']}/10")
-                c2.metric("SPICED", f"{report['spiced']}/10")
-
-            with tab2:
-                st.write(report["feedback"])
-
-            with tab3:
-                st.info(report["better_script"])
-
-            docx_file = create_docx_report(report)
-
-            st.download_button(
-                "📥 Download DOCX Report",
-                docx_file,
-                file_name=f"{rep_name}_call_coaching_report.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            )
-
-# =========================================================
-# HISTORY
-# =========================================================
+# ---------------- HISTORY ----------------
 elif page == "History":
-    st.header("📚 Past Reports")
+    st.header("📚 History")
 
-    if not st.session_state.reports:
-        st.warning("No reports available yet.")
-    else:
-        for i, report in enumerate(reversed(st.session_state.reports)):
-            with st.expander(
-                f"{i+1}. {report['rep']} | {report['timestamp']}"
-            ):
-                st.write(f"Call Type: {report['call_type']}")
-                st.write(f"MEDDIC: {report['meddic']}/10")
-                st.write(f"SPICED: {report['spiced']}/10")
-                st.write(report["feedback"])
-                st.info(report["better_script"])
+    for report in reversed(st.session_state.reports):
+        with st.expander(report["rep"]):
+            st.write(report)
