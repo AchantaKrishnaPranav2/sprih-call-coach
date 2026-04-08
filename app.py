@@ -37,6 +37,17 @@ with col2:
     """)
 
 if analyze:
+    transcript_lower = transcript.lower()
+
+    meddic = 8
+    spiced = 7
+
+    if "budget" in transcript_lower:
+        meddic += 1
+
+    if "pain" in transcript_lower:
+        spiced += 1
+
     st.success("Analysis complete")
 
     tab1, tab2, tab3 = st.tabs(
@@ -45,17 +56,15 @@ if analyze:
 
     with tab1:
         c1, c2 = st.columns(2)
-        c1.metric("MEDDIC", "8/10")
-        c2.metric("SPICED", "7/10")
+        c1.metric("MEDDIC", f"{meddic}/10")
+        c2.metric("SPICED", f"{spiced}/10")
 
     with tab2:
-        st.write("""
-        You did a strong job uncovering buyer pain.
-        The next opportunity is to quantify impact.
-        """)
+        st.write(
+            f"{rep_name}, you did a strong job uncovering buyer pain."
+        )
 
     with tab3:
-        st.info("""
-        Can you help me understand what this problem
-        is costing the business each quarter?
-        """)
+        st.info(
+            "Can you help me quantify the business impact?"
+        )
