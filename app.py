@@ -68,3 +68,25 @@ if analyze:
         st.info(
             "Can you help me quantify the business impact?"
         )
+    report = f"""
+        Sprih Call Coach Report
+
+        Rep: {rep_name}
+        Call Type: {call_type}
+        
+        MEDDIC: {meddic}/10
+        SPICED: {spiced}/10
+        
+        Feedback:
+        Strong pain discovery.
+        Need better quantification.
+        
+        Better Script:
+        Can you help quantify business impact?
+        """
+        
+        st.download_button(
+            "Download Report",
+            report,
+            file_name="call_coaching_report.txt"
+        )
