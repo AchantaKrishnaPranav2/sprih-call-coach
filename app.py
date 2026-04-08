@@ -1,11 +1,17 @@
 import streamlit as st
 from docx import Document
+import google.generativeai as genai
 
 st.set_page_config(
     page_title="Sprih Call Coach",
     page_icon="🎯",
     layout="wide"
 )
+genai.configure(
+    api_key=st.secrets["GEMINI_API_KEY"]
+)
+
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 def read_docx(uploaded_file):
     doc = Document(uploaded_file)
@@ -70,59 +76,48 @@ with col2:
     """)
 
 if analyze and transcript:
-    transcript_lower = transcript.lower()
+    prompt = f"""
+You are a supportive senior sales coach and deal strategist.
 
-    meddic = 8
-    spiced = 7
+Analyze the transcript using:
+- MEDDIC
+- SPICED
+- Deal Health
+- Coaching Moments
 
-    if "budget" in transcript_lower:
-        meddic += 1
+Be constructive.
+Address the rep directly as "you".
 
-    if "pain" in transcript_lower:
-        spiced += 1
+Output format:
+
+## Scores
+MEDDIC: X/10
+SPICED: X/10
+
+## Deal Health
+...
+
+## Coaching Feedback
+...
+
+## Better Script
+...
+
+Transcript:
+{transcript}
+"""
+
+    response = model.generate_content(prompt)
+
+    result = response.text
 
     st.success("Analysis complete")
 
-    tab1, tab2, tab3 = st.tabs(
-        ["📊 Scores", "🧠 Coaching", "🎯 Better Script"]
-    )
-
-    with tab1:
-        c1, c2 = st.columns(2)
-        c1.metric("MEDDIC", f"{meddic}/10")
-        c2.metric("SPICED", f"{spiced}/10")
-
-    with tab2:
-        st.write(
-            f"{rep_name}, you did a strong job uncovering buyer pain. "
-            "The next opportunity is quantifying impact."
-        )
-
-    with tab3:
-        st.info(
-            "Can you help me understand what this issue "
-            "is costing the business each quarter?"
-        )
-
-    report = f"""
-Sprih Call Coach Report
-
-Rep: {rep_name}
-Call Type: {call_type}
-
-MEDDIC: {meddic}/10
-SPICED: {spiced}/10
-
-Feedback:
-Strong pain discovery.
-Need better quantification.
-
-Better Script:
-Can you help quantify business impact?
-"""
+    st.write("## AI Coaching Report")
+    st.write(result)
 
     st.download_button(
         "📥 Download Report",
-        report,
+        result,
         file_name="call_coaching_report.txt"
     )
