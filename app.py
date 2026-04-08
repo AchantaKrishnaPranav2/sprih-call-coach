@@ -76,48 +76,32 @@ with col2:
     """)
 
 if analyze and transcript:
-    prompt = f"""
-You are a supportive senior sales coach and deal strategist.
+    try:
+        prompt = f"""
+You are a supportive senior sales coach.
 
-Analyze the transcript using:
+Analyze this transcript using:
 - MEDDIC
 - SPICED
 - Deal Health
-- Coaching Moments
-
-Be constructive.
-Address the rep directly as "you".
-
-Output format:
-
-## Scores
-MEDDIC: X/10
-SPICED: X/10
-
-## Deal Health
-...
-
-## Coaching Feedback
-...
-
-## Better Script
-...
+- Coaching Feedback
 
 Transcript:
 {transcript}
 """
 
-    response = model.generate_content(prompt)
+        response = model.generate_content(prompt)
 
-    result = response.text
+        result = response.text
 
-    st.success("Analysis complete")
+        st.success("Analysis complete")
+        st.write(result)
 
-    st.write("## AI Coaching Report")
-    st.write(result)
+        st.download_button(
+            "📥 Download Report",
+            result,
+            file_name="call_coaching_report.txt"
+        )
 
-    st.download_button(
-        "📥 Download Report",
-        result,
-        file_name="call_coaching_report.txt"
-    )
+    except Exception as e:
+        st.error(f"Gemini API Error: {str(e)}")
