@@ -1,10 +1,21 @@
 import streamlit as st
+from docx import Document
 
 st.set_page_config(
     page_title="Sprih Call Coach",
     page_icon="🎯",
     layout="wide"
 )
+
+def read_docx(uploaded_file):
+    doc = Document(uploaded_file)
+    full_text = []
+
+    for para in doc.paragraphs:
+        if para.text.strip():
+            full_text.append(para.text)
+
+    return "\n".join(full_text)
 
 st.title("🎯 Sprih Call Coach")
 st.caption("AI-powered sales call coaching dashboard")
@@ -20,10 +31,32 @@ with col1:
         ["Discovery", "Demo", "Followup", "Mixed"]
     )
 
-    transcript = st.text_area(
-        "Paste Transcript",
-        height=250
+    uploaded_file = st.file_uploader(
+        "Upload Transcript (.docx or .txt)",
+        type=["docx", "txt"]
     )
+
+    transcript = ""
+
+    if uploaded_file is not None:
+        if uploaded_file.name.endswith(".docx"):
+            transcript = read_docx(uploaded_file)
+        elif uploaded_file.name.endswith(".txt"):
+            transcript = str(uploaded_file.read(), "utf-8")
+
+        st.text_area(
+            "Extracted Transcript",
+            transcript,
+            height=250
+        )
+
+    transcript_manual = st.text_area(
+        "Or Paste Transcript",
+        height=200
+    )
+
+    if transcript_manual.strip():
+        transcript = transcript_manual
 
     analyze = st.button("Analyze Call")
 
@@ -36,7 +69,7 @@ with col2:
     - Coaching Moments
     """)
 
-if analyze:
+if analyze and transcript:
     transcript_lower = transcript.lower()
 
     meddic = 8
@@ -61,31 +94,35 @@ if analyze:
 
     with tab2:
         st.write(
-            f"{rep_name}, you did a strong job uncovering buyer pain."
+            f"{rep_name}, you did a strong job uncovering buyer pain. "
+            "The next opportunity is quantifying impact."
         )
 
     with tab3:
         st.info(
-            "Can you help me quantify the business impact?"
+            "Can you help me understand what this issue "
+            "is costing the business each quarter?"
         )
-    report = f"""
-        Sprih Call Coach Report
 
-        Rep: {rep_name}
-        Call Type: {call_type}
-        
-        MEDDIC: {meddic}/10
-        SPICED: {spiced}/10
-        
-        Feedback:
-        Strong pain discovery.
-        Need better quantification.
-        
-        Better Script:
-        Can you help quantify business impact?
-        """
+    report = f"""
+Sprih Call Coach Report
+
+Rep: {rep_name}
+Call Type: {call_type}
+
+MEDDIC: {meddic}/10
+SPICED: {spiced}/10
+
+Feedback:
+Strong pain discovery.
+Need better quantification.
+
+Better Script:
+Can you help quantify business impact?
+"""
+
     st.download_button(
-            "Download Report",
-            report,
-            file_name="call_coaching_report.txt"
-        )
+        "📥 Download Report",
+        report,
+        file_name="call_coaching_report.txt"
+    )
