@@ -84,8 +84,7 @@ if analyze:
         Better Script:
         Can you help quantify business impact?
         """
-        
-        st.download_button(
+    st.download_button(
             "Download Report",
             report,
             file_name="call_coaching_report.txt"
