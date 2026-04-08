@@ -1,8 +1,5 @@
 import streamlit as st
 from docx import Document
-from docx.shared import Pt, RGBColor
-from docx.oxml import OxmlElement
-from docx.oxml.ns import qn
 from datetime import datetime
 from io import BytesIO
 
@@ -16,8 +13,6 @@ st.set_page_config(
 )
 
 PRIMARY_GREEN = "#1a3a2a"
-CARD_BG = "#111827"
-ACCENT = "#10b981"
 
 # =====================================================
 # CSS
@@ -35,10 +30,16 @@ st.markdown(
     }}
 
     .card {{
-        background-color: {CARD_BG};
+        background-color: #111827;
         padding: 1rem;
-        border-radius: 14px;
+        border-radius: 12px;
+        margin-bottom: 1rem;
         border: 1px solid #1f2937;
+    }}
+
+    .step-title {{
+        font-size: 20px;
+        font-weight: 700;
         margin-bottom: 1rem;
     }}
     </style>
@@ -54,6 +55,9 @@ if "coach_reports" not in st.session_state:
 
 if "gtm_reports" not in st.session_state:
     st.session_state.gtm_reports = []
+
+if "latest_report" not in st.session_state:
+    st.session_state.latest_report = None
 
 # =====================================================
 # HELPERS
@@ -72,12 +76,12 @@ def generate_report(data):
 
     coaching = [
         {
-            "what": "You explored pain well.",
+            "what": "You explored the buyer pain clearly.",
             "why": "This improves discovery depth.",
-            "better": "Can you quantify the cost impact?"
+            "better": "Can you quantify the business cost?"
         },
         {
-            "what": "Decision authority not explored.",
+            "what": "Stakeholder authority was not explored.",
             "why": "This affects deal control.",
             "better": "Who else signs off internally?"
         }
@@ -112,7 +116,9 @@ def create_docx(report):
 
     doc.add_paragraph(f"Rep: {h['rep_name']}")
     doc.add_paragraph(f"Company: {h['company']}")
-    doc.add_paragraph(f"Type: {h['call_type']}")
+    doc.add_paragraph(f"Call Type: {h['call_type']}")
+    doc.add_paragraph(f"Origination: {h['origination']}")
+    doc.add_paragraph(f"Deal Stage: {h['deal_stage']}")
 
     doc.add_heading("Framework Scores", level=1)
 
@@ -126,7 +132,7 @@ def create_docx(report):
         doc.add_paragraph(f"Why: {c['why']}")
         doc.add_paragraph(f"Better: {c['better']}")
 
-    doc.add_heading("Actions", level=1)
+    doc.add_heading("Top Actions", level=1)
 
     for a in report["actions"]:
         doc.add_paragraph(a)
@@ -165,14 +171,14 @@ module = st.sidebar.radio(
 if module == "📊 Dashboard":
     st.header("📊 Dashboard")
 
-    col1, col2 = st.columns(2)
+    c1, c2 = st.columns(2)
 
-    col1.metric(
+    c1.metric(
         "Call Coach Reports",
         len(st.session_state.coach_reports)
     )
 
-    col2.metric(
+    c2.metric(
         "GTM Runs",
         len(st.session_state.gtm_reports)
     )
@@ -183,15 +189,24 @@ if module == "📊 Dashboard":
 elif module == "📞 Call Coach":
     st.header("📞 Call Coach Workflow")
 
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "1️⃣ Context",
-        "2️⃣ Scoring",
-        "3️⃣ Coaching",
-        "4️⃣ Actions",
-        "5️⃣ Download"
-    ])
+    step = st.radio(
+        "Workflow Step",
+        [
+            "1️⃣ Context",
+            "2️⃣ Scoring",
+            "3️⃣ Coaching",
+            "4️⃣ Actions",
+            "5️⃣ Download",
+        ],
+        horizontal=True
+    )
 
-    with tab1:
+    if step == "1️⃣ Context":
+        st.markdown(
+            '<div class="step-title">Step 1 — Context</div>',
+            unsafe_allow_html=True
+        )
+
         rep_name = st.text_input("Sales Rep Name")
         company = st.text_input("Prospect / Company")
 
@@ -215,9 +230,7 @@ elif module == "📞 Call Coach":
             height=300
         )
 
-        generate = st.button("Generate Workflow Report")
-
-        if generate:
+        if st.button("Generate Workflow Report"):
             report = generate_report({
                 "rep_name": rep_name,
                 "company": company,
@@ -230,32 +243,53 @@ elif module == "📞 Call Coach":
             st.session_state.latest_report = report
             st.session_state.coach_reports.append(report)
 
-            st.success("Workflow report generated")
+            st.success(
+                "Step 1 complete — move to Scoring"
+            )
 
-    if "latest_report" in st.session_state:
+    if st.session_state.latest_report:
         report = st.session_state.latest_report
 
-        with tab2:
-            st.subheader("Framework Scores")
+        if step == "2️⃣ Scoring":
+            st.markdown(
+                '<div class="step-title">Step 2 — Scoring</div>',
+                unsafe_allow_html=True
+            )
 
             for k, v in report["meddic"].items():
                 st.metric(k, f"{v}/10")
 
-        with tab3:
-            st.subheader("Coaching Moments")
+            st.metric(
+                "Overall Score",
+                f"{report['overall_score']}/10"
+            )
+
+        elif step == "3️⃣ Coaching":
+            st.markdown(
+                '<div class="step-title">Step 3 — Coaching</div>',
+                unsafe_allow_html=True
+            )
 
             for c in report["coaching"]:
-                st.error(f"What happened: {c['what']}")
-                st.info(f"Why it matters: {c['why']}")
-                st.success(f"Better version: {c['better']}")
+                st.error(f"What: {c['what']}")
+                st.info(f"Why: {c['why']}")
+                st.success(f"Better: {c['better']}")
 
-        with tab4:
-            st.subheader("Immediate Actions")
+        elif step == "4️⃣ Actions":
+            st.markdown(
+                '<div class="step-title">Step 4 — Actions</div>',
+                unsafe_allow_html=True
+            )
 
             for a in report["actions"]:
                 st.warning(a)
 
-        with tab5:
+        elif step == "5️⃣ Download":
+            st.markdown(
+                '<div class="step-title">Step 5 — Download</div>',
+                unsafe_allow_html=True
+            )
+
             docx = create_docx(report)
 
             st.download_button(
